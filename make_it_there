@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+
+# make_it_there is a script to set up a simple Sinatra project in a way I like it
+# it takes a project name, preferably in the format `project_name`
+# the project name will be used to create a dir (project_name) and a base class (ProjectName) in the code
+
+project_name=$1
+project_class=`echo $project_name | perl -pe 's/(^|_)./uc($&)/ge;s/_//g'`
+
+echo "Building new Sinatra project: ${project_name}"
+mkdir $project_name
+
+# set up a basic project structure
+project_folders=("models" "views")
+
+for d in ${project_folders[@]}; do
+  mkdir "$project_name/$d"
+done
+
+# create the core files
+project_files=(".gitignore" "Gemfile" "README.md" "app.rb" "config.ru" "views/layout.erb" "views/page.erb")
+
+for f in ${project_files[@]}; do
+  touch "$project_name/$f"
+done
+
+# set up Gemfile
+echo "source 'https://rubygems.org'
+
+gem 'sinatra'
+
+group :development do
+  gem 'shotgun'  # reloads app code so I don't have to restart Sinatra all the time
+end
+" >> "$project_name/Gemfile"
+
+# set up the app file, where the main routes will go
+echo "require 'sinatra/base'
+Dir[\"./models/*.rb\"].each {|file| require file }
+
+class App < Sinatra::Base
+
+  get '/' do
+    \"hi!\"
+  end
+
+  get '/page' do
+    @page_title = \"page\"
+    erb :page
+  end
+
+  run! if app_file == \$0
+end
+" >> "$project_name/app.rb"
+
+# set up config.ru, which gets used by shotgun
+echo "require './app'
+
+run App" >> "$project_name/config.ru"
+
+# set up README.md because why not?
+echo "# ${project_class}
+
+Here's a new basic Sinatra app.
+
+To run it locally:
+\`ruby app.rb\`
+or
+\`shotgun app.rb\`" >> "$project_name/README.md"
+
+# set up layout template and a page that uses it
+echo "<!DOCTYPE html>
+<html>
+<head>
+  <title><%= @page_title %></title>
+</head>
+<body>
+  <%= yield %>
+</body>
+</html>" >> "$project_name/views/layout.erb"
+
+echo "hi (using the layout template)" >> "$project_name/views/page.erb"
+
+# Now let's install the gems
+echo "Installing gems for your new project..."
+
+cd $project_name
+bundle install
+
+# All set!
+echo "Your project is now set up in ${project_name}"
